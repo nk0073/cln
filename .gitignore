@@ -1,0 +1,18 @@
+build/
+.vscode/
+
+# compiled binaries
+app
+main
+
+*.o
+*.a
+*.so
+*.out
+*.swp
+*.swo
+*~
+.DS_Store
+.idea/
+
+!.clangd
