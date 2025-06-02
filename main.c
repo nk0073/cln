@@ -23,7 +23,14 @@ int main(void) {
     printf("capacity: %zu   size: %zu\n\n", buffer.capacity, buffer.size);
     printf("code a: %d,     code b: %d     code c: %d\n", codea, codeb, codec);
 
+    const size_t layout_size = 5;
+    const cln_layout layout[] = {CLN_UINT32, CLN_FLOAT, CLN_STRING, CLN_INT32, CLN_UINT8};
+    cln_set_layout(&buffer, layout, layout_size);
+    printf("first layout set working: %s\n", *buffer.layout == CLN_UINT32 ? "true" : "false");
+    const cln_layout layout1[] = {CLN_STRING, CLN_FLOAT, CLN_STRING, CLN_INT32, CLN_UINT8};
+    cln_set_layout(&buffer, layout1, layout_size);
+    printf("second layout set working: %s\n", *buffer.layout == CLN_STRING ? "true" : "false");
+    cln_free_buffer(&buffer);
 
-    free(buffer.str);
     return 0;
 }
