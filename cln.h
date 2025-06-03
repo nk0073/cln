@@ -16,9 +16,11 @@
 #define _CLN_IMPORTS
 
 #define CLN_SUCCESS 0
+// to get more info about errors, call cln_get_last_err()
 #define CLN_ERROR_OUT_OF_BOUNDS -1
 #define CLN_ERROR_INVALID_POINTER -2
 #define CLN_ERROR_EMPTY_LAOUT -3
+#define CLN_ERROR_SNPRINTF -4
 
 #define CLN_RAW_SEPARATOR ','
 #define CLN_INT64_MAX_LENGTH 22
@@ -46,7 +48,8 @@
 #endif
 
 #define CLN_ERROR_SIZE 1024
-char cln_last_error[CLN_ERROR_SIZE];
+static char cln_last_error[CLN_ERROR_SIZE];
+char* cln_get_last_err(void) { return cln_last_error; }
 
 typedef enum {
     CLN_STRING,
@@ -69,7 +72,8 @@ typedef enum {
 typedef struct {
     char* str; // data in string format
     size_t size; // how many bytes (chars) is used
-    size_t capacity; // max size
+    size_t capacity; // max size EXCLUDING \0
+    size_t count; // the amount of items added
     
     // can be 0 until needed
     cln_layout* layout;
@@ -91,7 +95,7 @@ cln_buffer cln_create_buffer(size_t bytes) {
         .str = str,
         .size = 0,
         .capacity = bytes,
-        .err = 0,
+        .count = 0,
     };
 }
 
@@ -125,6 +129,7 @@ int32_t __cln_add_char_ptr(cln_buffer* buffer, const char* str) {
         strcpy(buffer->str, str);
     }
     
+    buffer->count++;
     return CLN_SUCCESS;
 }
 
@@ -167,7 +172,7 @@ int32_t cln_add_str(cln_buffer* buffer, const char* str, const size_t bytes) {
     return exit_code;
 }
 
-void __cln_report_snprintf_err(void) {
+int32_t __cln_report_snprintf_err(void) {
     switch (errno) {
         case EOVERFLOW:
             snprintf(cln_last_error, CLN_ERROR_SIZE, "snprintf error: Output was truncated and could not fit in the buffer.\n");
@@ -181,12 +186,14 @@ void __cln_report_snprintf_err(void) {
         default:
             snprintf(cln_last_error, CLN_ERROR_SIZE, "snprintf unknown error: %s\n", strerror(errno));
     }
+
+    return CLN_ERROR_SNPRINTF;
 }
 
 int32_t cln_add_int(cln_buffer* buffer, int64_t value) {
     char str[CLN_INT64_MAX_LENGTH];
     if(snprintf(str, CLN_INT64_MAX_LENGTH, "%ld", value) < 0) {
-        __cln_report_snprintf_err();
+        return __cln_report_snprintf_err();;
     }
 
     return __cln_add_char_ptr(buffer, str);
@@ -195,7 +202,7 @@ int32_t cln_add_int(cln_buffer* buffer, int64_t value) {
 int32_t cln_add_uint(cln_buffer* buffer, const uint64_t value) {
     char str[CLN_UINT64_MAX_LENGTH];
     if(snprintf(str, CLN_UINT64_MAX_LENGTH, "%ld", value) < 0) {
-        __cln_report_snprintf_err();
+        return __cln_report_snprintf_err();;
     }
 
     return __cln_add_char_ptr(buffer, str);
@@ -205,7 +212,7 @@ int32_t cln_add_uint(cln_buffer* buffer, const uint64_t value) {
 int32_t cln_add_float(cln_buffer* buffer, const float value, const char* format) {
     char str[CLN_FLOAT_MAX_LENGTH];
     if(snprintf(str, CLN_FLOAT_MAX_LENGTH, format, value) < 0) {
-        __cln_report_snprintf_err();
+        return __cln_report_snprintf_err();;
     }
     return __cln_add_char_ptr(buffer, str);
 }
@@ -214,7 +221,7 @@ int32_t cln_add_float(cln_buffer* buffer, const float value, const char* format)
 int32_t cln_add_double(cln_buffer* buffer, const double value, const char* format) {
     char str[CLN_DOUBLE_MAX_LENGTH];
     if(snprintf(str, CLN_DOUBLE_MAX_LENGTH, format, value) < 0) {
-        __cln_report_snprintf_err();
+        return __cln_report_snprintf_err();;
     }
 
     return __cln_add_char_ptr(buffer, str);
@@ -253,6 +260,7 @@ int32_t cln_set_layout(cln_buffer* buffer, const cln_layout* layout, const size_
 
     return CLN_SUCCESS;
 }
+
 
 void cln_free_buffer(cln_buffer* buffer) {
     free(buffer->str);
