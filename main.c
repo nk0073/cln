@@ -34,7 +34,6 @@ int main(void) {
 
     cln_free_buffer(&buffer);
 
-    
     const char* sample = "55.3,very good";
     cln_buffer read_buffer = cln_read_buffer(sample);
     cln_set_layout(&read_buffer, (cln_layout[]){CLN_FLOAT, CLN_STRING}, 2);
@@ -42,12 +41,11 @@ int main(void) {
     float* rr_float = NULL;
     char* rr_str = NULL;
     cln_alloc_retrieve_items(&read_buffer, &rr_float, &rr_str);
-    printf("\n\nread buffer success: %d\n",
-            *rr_float == 55.3f && strcmp(rr_str, "very good") == 0);
+    printf("\n\nread buffer success: %d\n", *rr_float == 55.3f && strcmp(rr_str, "very good") == 0);
 
     free(rr_float);
     free(rr_str);
-    
+
     cln_free_buffer(&read_buffer);
     return 0;
 }

@@ -4,3 +4,5 @@ TabWidth: 4
 UseTab: Never
 DerivePointerAlignment: false
 PointerAlignment: Left
+SpaceBeforeParens: Never
+ColumnLimit: 135
