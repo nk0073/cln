@@ -3,12 +3,10 @@
  *
  *  Right now it's only possible to encode the data without layout
  *
- *  todos (in order)
- *  TODO: finish todos in the file below this comment
- *  TODO: add pop functions (pop_int8t, pop, pop_str)
- *  TODO: add tests
  *  TODO: ease the use of arrays
+ *  TODO: add tests
  *  TODO: make production ready
+ *  TODO: add set item function
  */
 
 #ifndef _CLN_IMPORTS
@@ -74,15 +72,19 @@ typedef enum {
 
 // Important to remember that the allocation is linear
 typedef struct {
+    // non nullable
     char* str;       // data in string format
     size_t size;     // how many bytes (chars) is used
     size_t capacity; // max size EXCLUDING \0
     size_t count;    // the amount of items added
 
-    // can be 0 until needed
+    // nullable
     cln_layout* layout;
     size_t layout_len;
     int32_t err;
+
+    void** allocated_vars; // all allocated variables by cln_retrieve items
+    size_t allocated_len;
 } cln_buffer;
 
 #ifdef CLN_IMPLEMENTATION // TODO: change to ifndef when done
@@ -105,6 +107,9 @@ cln_buffer cln_create_buffer(size_t bytes) {
         .layout = NULL,
         .layout_len = 0,
         .err = 0,
+
+        .allocated_vars = NULL,
+        .allocated_len = 0,
     };
 }
 
@@ -120,7 +125,6 @@ void __cln_buffer_increase_capacity(cln_buffer* buffer, const size_t needed_capa
     }
 }
 
-// TODO: dont realloc every time, realloc to twice the size if needed
 int32_t __cln_add_char_ptr(cln_buffer* buffer, const char* str) {
     if(buffer->size > 0) {
         // + 2 because \0 and the separator symbol
@@ -265,10 +269,15 @@ int32_t cln_set_layout(cln_buffer* buffer, const cln_layout* layout, const size_
     }
 
     free(buffer->layout);
+    free(buffer->allocated_vars);
+
     const size_t layout_bytes = sizeof(cln_layout) * layout_len;
     buffer->layout = malloc(layout_bytes);
     memcpy(buffer->layout, layout, layout_bytes);
+    buffer->allocated_vars = malloc(sizeof(void*) * layout_len);
+
     buffer->layout_len = layout_len;
+    buffer->allocated_len = layout_len;
 
     return CLN_SUCCESS;
 }
@@ -366,21 +375,23 @@ int32_t __cln_alloc_get_by_index(cln_buffer* buffer, const size_t index, void** 
     return CLN_SUCCESS;
 }
 
-// the caller needs to free everything themselves
-// TODO: add an array when declaring layout that will hold all these pointer and
-// free in cln_free_buffer
-int32_t cln_alloc_retrieve_items(cln_buffer* buffer, ...) {
+int32_t cln_retrieve_items(cln_buffer* buffer, ...) {
     va_list args;
     va_start(args, buffer);
     int32_t last_result = CLN_SUCCESS;
     for(size_t x = 0; x < buffer->layout_len; x++) {
         void** arg = va_arg(args, void**);
+        if(arg == NULL) {
+            buffer->allocated_vars[x] = NULL;
+            continue;
+        }
+
         last_result = __cln_alloc_get_by_index(buffer, x, arg);
+        buffer->allocated_vars[x] = *arg;
         if(last_result < 0) {
             return last_result;
         }
     }
-
     return last_result;
 }
 
@@ -389,11 +400,17 @@ int32_t cln_alloc_retrieve_items(cln_buffer* buffer, ...) {
 void cln_free_buffer(cln_buffer* buffer) {
     free(buffer->str);
     free(buffer->layout);
+    for(size_t x = 0; x < buffer->allocated_len; ++x) {
+        free(buffer->allocated_vars[x]);
+    }
+
+    free(buffer->allocated_vars);
 }
 
 void cln_trim_capacity(cln_buffer* buffer) {
     if(buffer->capacity == buffer->size)
         return;
+
     buffer->capacity = buffer->size;
     buffer->str = realloc(buffer->str, buffer->capacity + 1);
 }

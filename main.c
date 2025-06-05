@@ -22,15 +22,10 @@ int main(void) {
     int32_t* r_int = NULL;
     double* r_double = NULL;
     char* r_estr = NULL;
-    cln_alloc_retrieve_items(&buffer, &r_str, &r_int, &r_double, &r_estr);
+    cln_retrieve_items(&buffer, &r_str, &r_int, &r_double, &r_estr);
     printf("res str: |%s|\nres int: |%d|\nres double: |%f|\n", r_str, *r_int, *r_double);
     printf("\nstr equal: %d\nint equal: %d\ndouble equal: %d\n", strcmp(s_str, r_str) == 0, s_int == *r_int, s_double == *r_double);
     printf("res empty str: |%s|\n", r_estr);
-
-    free(r_str);
-    free(r_int);
-    free(r_double);
-    free(r_estr);
 
     cln_free_buffer(&buffer);
 
@@ -40,11 +35,8 @@ int main(void) {
 
     float* rr_float = NULL;
     char* rr_str = NULL;
-    cln_alloc_retrieve_items(&read_buffer, &rr_float, &rr_str);
+    cln_retrieve_items(&read_buffer, &rr_float, &rr_str);
     printf("\n\nread buffer success: %d\n", *rr_float == 55.3f && strcmp(rr_str, "very good") == 0);
-
-    free(rr_float);
-    free(rr_str);
 
     cln_free_buffer(&read_buffer);
     return 0;
