@@ -4,13 +4,12 @@
  *  Right now it's only possible to encode the data without layout
  *
  *  TODO: fix __cln_alloc_get_by_index empty string issues
- *  TODO: make production ready
  *  TODO: add documentation
  *  TODO: perhaps add more error codes somewhere
  */
 
-#ifndef _CLN_IMPORTS
-#define _CLN_IMPORTS
+#ifndef _CLN_H
+#define _CLN_H
 
 #define CLN_SUCCESS 0
 #define CLN_EMPTY_STRING 1
@@ -30,29 +29,26 @@
 #include <errno.h>
 #include <inttypes.h>
 #include <limits.h>
-#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#ifdef __cplusplus
-#include <cstdarg>
-#include <cstddef>
-#include <cstdint>
-#include <cstring>
-#else
+#ifndef __cplusplus
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#else
+#include <cstdarg>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+extern "C" {
 #endif
 
 #endif
 
 #define CLN_ERROR_SIZE 1024
-static char cln_last_error[CLN_ERROR_SIZE];
-char* cln_get_last_err(void) { return cln_last_error; }
-#define __CLN_ERROR(x) snprintf(cln_last_error, CLN_ERROR_SIZE, x)
-#define __CLN_ERROR_ARGS(x, ...) snprintf(cln_last_error, CLN_ERROR_SIZE, x, __VA_ARGS__)
+extern char* cln_get_last_err(void);
 
 typedef enum {
     CLN_STRING,
@@ -88,11 +84,38 @@ typedef struct {
     size_t allocated_len;
 } cln_buffer;
 
-#ifdef CLN_IMPLEMENTATION // TODO: change to ifndef when done
 
-// declarations
+extern cln_buffer cln_create_buffer(size_t bytes);
 
-#else
+extern int32_t cln_add_str(cln_buffer* buffer, const char* str, const size_t bytes);
+
+extern int32_t cln_add_int(cln_buffer* buffer, int64_t value);
+
+extern int32_t cln_add_uint(cln_buffer* buffer, const uint64_t value);
+
+extern int32_t cln_add_float(cln_buffer* buffer, const float value, const char* format);
+
+extern int32_t cln_add_double(cln_buffer* buffer, const double value, const char* format);
+
+extern cln_buffer cln_read_buffer(const char* cln_source);
+
+extern int32_t cln_set_layout(cln_buffer* buffer, const cln_layout* layout, const size_t layout_len);
+
+// all va_args should be void** 
+extern int32_t cln_retrieve_items(cln_buffer* buffer, ...);
+
+extern void cln_free_buffer(cln_buffer* buffer);
+
+extern void cln_trim_capacity(cln_buffer* buffer);
+
+#ifdef CLN_IMPLEMENTATION 
+
+#define __CLN_ERROR(x) snprintf(cln_last_error, CLN_ERROR_SIZE, x)
+#define __CLN_ERROR_ARGS(x, ...) snprintf(cln_last_error, CLN_ERROR_SIZE, x, __VA_ARGS__)
+
+
+static char cln_last_error[CLN_ERROR_SIZE];
+char* cln_get_last_err(void) { return cln_last_error; }
 
 cln_buffer cln_create_buffer(size_t bytes) {
     if(bytes == 0)
@@ -114,7 +137,7 @@ cln_buffer cln_create_buffer(size_t bytes) {
     };
 }
 
-void __cln_buffer_increase_capacity(cln_buffer* buffer, const size_t needed_capacity) {
+static void __cln_buffer_increase_capacity(cln_buffer* buffer, const size_t needed_capacity) {
     int8_t increased = 0;
     if(buffer->capacity == 0 && needed_capacity > 0) {
         buffer->capacity++;
@@ -130,7 +153,7 @@ void __cln_buffer_increase_capacity(cln_buffer* buffer, const size_t needed_capa
     }
 }
 
-int32_t __cln_add_char_ptr(cln_buffer* buffer, const char* str) {
+static int32_t __cln_add_char_ptr(cln_buffer* buffer, const char* str) {
     if(buffer->size > 0) {
         // + 2 because \0 and the separator symbol
         const size_t temp_str_len = strlen(str) + 2;
@@ -199,7 +222,7 @@ int32_t cln_add_str(cln_buffer* buffer, const char* str, const size_t bytes) {
     return exit_code;
 }
 
-int32_t __cln_report_snprintf_err(void) {
+static int32_t __cln_report_snprintf_err(void) {
     switch(errno) {
     case EOVERFLOW:
         __CLN_ERROR("snprintf error: Output was truncated and could not fit in "
@@ -302,7 +325,7 @@ int32_t cln_set_layout(cln_buffer* buffer, const cln_layout* layout, const size_
     return CLN_SUCCESS;
 }
 
-int32_t __cln_alloc_get_by_index(cln_buffer* buffer, const size_t index, void** out) {
+static int32_t __cln_alloc_get_by_index(cln_buffer* buffer, const size_t index, void** out) {
     size_t current_index = 0;
     uint32_t start = 0;
     uint32_t len = 0;
@@ -412,16 +435,11 @@ int32_t cln_retrieve_items(cln_buffer* buffer, ...) {
     return last_result;
 }
 
-// the caller needs to free z themselves
-#define cln_alloc_get_by_index(x, y, z) __cln_alloc_get_by_index(x, y, &z)
-
 void cln_free_buffer(cln_buffer* buffer) {
     free(buffer->str);
     free(buffer->layout);
     for(size_t x = 0; x < buffer->allocated_len; ++x) {
-        void* __tmp = buffer->allocated_vars[x];
-        free(__tmp);
-        // free(buffer->allocated_vars[x]);
+        free(buffer->allocated_vars[x]);
     }
 
     free(buffer->allocated_vars);
@@ -435,4 +453,7 @@ void cln_trim_capacity(cln_buffer* buffer) {
     buffer->str = realloc(buffer->str, buffer->capacity + 1);
 }
 
+#endif
+#ifdef __cplusplus
+}
 #endif

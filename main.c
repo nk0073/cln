@@ -1,3 +1,4 @@
+#define CLN_IMPLEMENTATION
 #include "cln.h"
 #include <errno.h>
 #include <stdio.h>
